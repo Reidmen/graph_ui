@@ -56,8 +56,14 @@
         // Define node types
         function ProductNode() {
             this.addOutput("output", "ingredient");
-            this.size = [120, 30];
-            this.properties = { name: "" };
+            this.size = [180, 55];
+            this.properties = {
+                name: "",
+                volume: 0
+            };
+
+            // Add widget to show volume
+            this.addWidget("text", "Volume", "", function (v) { }, { readonly: true });
         }
 
         ProductNode.title = "Product";
@@ -101,11 +107,12 @@
                 const lines = csv.split('\n');
                 const headers = lines[0].split(',');
 
-                // Find indices for product_name and ingredients columns
+                // Find indices for product_name, ingredients, and volume columns
                 const productIndex = headers.findIndex(h => h.trim() === 'product_name');
                 const ingredientsIndex = headers.findIndex(h => h.trim() === 'ingredients');
+                const volumeIndex = headers.findIndex(h => h.trim() === 'volume_ordered_quarterly');
 
-                if (productIndex === -1 || ingredientsIndex === -1) {
+                if (productIndex === -1 || ingredientsIndex === -1 || volumeIndex === -1) {
                     console.error("Required columns not found");
                     return;
                 }
@@ -118,27 +125,33 @@
 
                     // Split line but preserve ingredients array
                     const columns = line.split(/,(?![^\[]*\])/);
-                    if (columns.length <= Math.max(productIndex, ingredientsIndex)) return;
+                    if (columns.length <= Math.max(productIndex, ingredientsIndex, volumeIndex)) return;
 
                     const product = columns[productIndex].trim();
                     const ingredients = parseIngredients(columns[ingredientsIndex]);
+                    const volume = parseInt(columns[volumeIndex]) || 0;
 
                     if (!productMap.has(product)) {
-                        productMap.set(product, new Set(ingredients));
+                        productMap.set(product, {
+                            ingredients: new Set(ingredients),
+                            volume: volume
+                        });
                     }
                 });
 
                 // Create nodes with spacing
                 let x = 250;
                 let y = 250;
-                const productSpacing = 600;
+                const productSpacing = 700;
                 const nodesPerRow = 3;
 
                 // Create product and ingredient nodes
-                Array.from(productMap.entries()).forEach(([product, ingredients], index) => {
+                Array.from(productMap.entries()).forEach(([product, data], index) => {
                     const productNode = LiteGraph.createNode("basic/product");
                     productNode.title = product;
                     productNode.properties.name = product;
+                    productNode.properties.volume = data.volume;
+                    productNode.widgets[0].value = `Volume: ${data.volume.toLocaleString()}`;
                     productNode.color = "#2E4053";
 
                     productNode.pos = [
@@ -148,10 +161,10 @@
 
                     graph.add(productNode);
 
-                    // Add ingredient nodes around the product
-                    const ingredientRadius = 200;
-                    Array.from(ingredients).forEach((ingredient, i) => {
-                        const angle = (i * 2 * Math.PI) / ingredients.size;
+                    const ingredientRadius = 250;
+                    const ingredientsList = Array.from(data.ingredients);
+                    ingredientsList.forEach((ingredient, i) => {
+                        const angle = (i * 2 * Math.PI) / ingredientsList.length;
 
                         const ingredientNode = LiteGraph.createNode("basic/ingredient");
                         ingredientNode.title = ingredient;
