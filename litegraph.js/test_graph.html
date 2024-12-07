@@ -1,0 +1,123 @@
+<html>
+
+<head>
+    <link rel="stylesheet" type="text/css" href="css/litegraph.css">
+    <script type="text/javascript" src="build/litegraph.js"></script>
+</head>
+
+<body style='width:100%; height:100%'>
+    <div class="controls">
+        <input type="file" id="csvFile" accept=".csv" />
+    </div>
+    <canvas id='mycanvas' width='1024' height='720'></canvas>
+    <script>
+        var graph = new LGraph();
+        var canvas = new LGraphCanvas("#mycanvas", graph);
+
+        // Enable basic interactions
+        canvas.allow_dragcanvas = true;
+        canvas.allow_dragnodes = true;
+
+        // Define node types
+        function ProductNode() {
+            this.addOutput("output", "ingredient");
+            this.size = [120, 30];
+            this.properties = { name: "" };
+        }
+
+        ProductNode.title = "Product";
+        LiteGraph.registerNodeType("basic/product", ProductNode);
+
+        function IngredientNode() {
+            this.addInput("input", "ingredient");
+            this.size = [120, 30];
+            this.properties = { name: "" };
+        }
+
+        IngredientNode.title = "Ingredient";
+        LiteGraph.registerNodeType("basic/ingredient", IngredientNode);
+
+        document.getElementById('csvFile').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function (event) {
+                // Clear existing graph
+                graph.clear();
+
+                // Parse CSV and group ingredients by product
+                const csv = event.target.result;
+                const lines = csv.split('\n');
+
+                // Create a map of products and their ingredients
+                const productMap = new Map();
+
+                lines.slice(1).forEach(line => {
+                    if (!line.trim()) return;
+                    const [product, ingredient] = line.split(',').map(x => x.trim());
+
+                    if (!productMap.has(product)) {
+                        productMap.set(product, new Set());
+                    }
+                    productMap.get(product).add(ingredient);
+                });
+
+                // Create nodes with spacing
+                let x = 250;
+                let y = 250;
+                const productSpacing = 600;
+                const nodesPerRow = 3;
+
+                // Create product and ingredient nodes
+                Array.from(productMap.entries()).forEach(([product, ingredients], index) => {
+                    // Create product node
+                    const productNode = LiteGraph.createNode("basic/product");
+                    productNode.title = product;
+                    productNode.properties.name = product;
+                    productNode.color = "#2E4053"; // Dark blue for products
+
+                    // Position product nodes in a grid
+                    productNode.pos = [
+                        x + (index % nodesPerRow) * productSpacing,
+                        y + Math.floor(index / nodesPerRow) * productSpacing
+                    ];
+
+                    graph.add(productNode);
+
+                    // Add ingredient nodes around the product
+                    const ingredientRadius = 200;
+                    Array.from(ingredients).forEach((ingredient, i) => {
+                        const angle = (i * 2 * Math.PI) / ingredients.size;
+
+                        const ingredientNode = LiteGraph.createNode("basic/ingredient");
+                        ingredientNode.title = ingredient;
+                        ingredientNode.properties.name = ingredient;
+                        ingredientNode.color = "#873600"; // Brown for ingredients
+
+                        // Position ingredient in a circle around product
+                        ingredientNode.pos = [
+                            productNode.pos[0] + ingredientRadius * Math.cos(angle),
+                            productNode.pos[1] + ingredientRadius * Math.sin(angle)
+                        ];
+
+                        graph.add(ingredientNode);
+
+                        // Create edge between product and ingredient
+                        const link = productNode.connect(0, ingredientNode, 0);
+                        if (link) {
+                            link.color = "#E59866"; // Orange color for connections
+                            link.width = 2; // Make connections more visible
+                        }
+                    });
+                });
+
+                // Start the graph
+                graph.start();
+            };
+
+            reader.readAsText(file);
+        });
+    </script>
+</body>
+
+</html>
